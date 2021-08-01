@@ -22,9 +22,10 @@ public class GmProxyApplication {
 			UriConfiguration uriConfiguration) {
 		// System.out.println("uriConfiguration.getHttpbin(): " +
 		// uriConfiguration.getHttpbin());
-		return builder.routes()
-				.route(r -> r.alwaysTrue().filters(
-						f -> f.filter(modifyReqHeaderFactory.apply(new ModifyReqHeaderGatewayFilterFactory.Config())))
+		return builder.routes().route("remove-prefix-add-header",
+				r -> r.path("/api/**")
+						.filters(f -> f.rewritePath("/api/(?<segment>.*)", "/${segment}")
+								.filter(modifyReqHeaderFactory.apply(new ModifyReqHeaderGatewayFilterFactory.Config())))
 						.uri(uriConfiguration.getHttpbin()))
 				.build();
 	}

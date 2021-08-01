@@ -9,6 +9,9 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseToken;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auth.oauth2.ServiceAccountCredentials;
+import com.google.auth.oauth2.IdTokenCredentials;
+import com.google.auth.oauth2.IdTokenProvider;
+import java.io.IOException;
 
 @Component
 public class ModifyReqHeaderGatewayFilterFactory
@@ -35,7 +38,9 @@ public class ModifyReqHeaderGatewayFilterFactory
         return (exchange, chain) -> {
             String authValue = exchange.getRequest().getHeaders().getFirst(AUTHORIZATION);
             String email = getCallerEmail(authValue);
-            String myIdToken = getIdToken();
+            // String myIdToken = getIdToken();
+            String myIdToken = generateSelfIdToken();
+            // System.out.println("self ID token: " + myIdToken);
             ServerHttpRequest request = exchange.getRequest().mutate().header(ORIGINAL_REQUESTER, email)
                     .header(AUTHORIZATION, "Bearer " + myIdToken).build();
             return chain.filter(exchange.mutate().request(request).build());
@@ -64,6 +69,7 @@ public class ModifyReqHeaderGatewayFilterFactory
         }
     }
 
+    // It doesn't work on Cloud Run. It works with local service account key file.
     private String getIdToken() {
         try {
             GoogleCredentials credentials = GoogleCredentials.getApplicationDefault();
@@ -73,6 +79,22 @@ public class ModifyReqHeaderGatewayFilterFactory
             return idToken;
         } catch (Exception e) {
             System.out.println(e.getMessage());
+            return null;
+        }
+    }
+
+    private String generateSelfIdToken() {
+        try {
+            GoogleCredentials credentials = GoogleCredentials.getApplicationDefault();
+            if (!(credentials instanceof IdTokenProvider)) {
+                System.out.println("credentials: " + credentials);
+                return null;
+            }
+            IdTokenCredentials tokenCredential = IdTokenCredentials.newBuilder()
+                    .setIdTokenProvider((IdTokenProvider) credentials).setTargetAudience(GM_AUDIENCE).build();
+            return tokenCredential.refreshAccessToken().getTokenValue();
+        } catch (IOException e) {
+            System.out.println("generateSelfIdToken exception: " + e);
             return null;
         }
     }
